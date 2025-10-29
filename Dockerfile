@@ -1,7 +1,7 @@
-# ---------- Base image ----------
+# Use official Python image
 FROM python:3.11-slim
 
-# ---------- System dependencies ----------
+# Install base dependencies
 RUN apt-get update && apt-get install -y \
     wget unzip gnupg ca-certificates curl \
     fonts-liberation libnss3 libxss1 libasound2 \
@@ -10,31 +10,28 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# ---------- Install Google Chrome (fixed v120) ----------
-RUN mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor -o /etc/apt/keyrings/google-linux.gpg && \
-    echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-linux.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
-    > /etc/apt/sources.list.d/google-chrome.list && \
-    apt-get update && \
-    apt-get install -y google-chrome-stable=120.0.6099.109-1 && \
-    rm -rf /var/lib/apt/lists/*
+# ===== Install Google Chrome (fixed direct download) =====
+RUN wget -q https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && \
+    apt-get update && apt-get install -y ./google-chrome-stable_current_amd64.deb && \
+    rm google-chrome-stable_current_amd64.deb
 
-# ---------- Install matching ChromeDriver (v120) ----------
-RUN wget -q https://chromedriver.storage.googleapis.com/120.0.6099.109/chromedriver_linux64.zip -O /tmp/chromedriver.zip && \
+# ===== Install compatible ChromeDriver (version 131.x) =====
+RUN wget -q https://storage.googleapis.com/chrome-for-testing-public/131.0.6778.69/linux64/chromedriver-linux64.zip -O /tmp/chromedriver.zip && \
     unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
-    rm /tmp/chromedriver.zip && \
+    mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+    rm -rf /usr/local/bin/chromedriver-linux64 /tmp/chromedriver.zip && \
     chmod +x /usr/local/bin/chromedriver
 
-# ---------- Environment ----------
+# ===== Environment =====
 ENV DISPLAY=:99
-WORKDIR /app
 
-# ---------- Copy project ----------
+# ===== Copy project =====
+WORKDIR /app
 COPY . /app
 
-# ---------- Python packages ----------
+# ===== Install Python dependencies =====
 RUN pip install --no-cache-dir -r requirements.txt
 
-# ---------- Expose & run ----------
+# ===== Expose and run =====
 EXPOSE 8080
 CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:8080", "--workers", "1", "--threads", "4"]
